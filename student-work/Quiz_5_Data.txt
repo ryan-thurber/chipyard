@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 isp_bench
 
 phase          cycles    instret     branch       load        mul  bp_dir_ms  bp_tgt_ms   md_stall    ic_miss    dc_miss
@@ -12,4 +13,20 @@ bgmodel        121627      44372       5128       4608          0       4342    
 
 detect         593606     426156      65568      65536          0      32767         34          0          3         31
 
+=======
+isp_bench
+
+phase          cycles    instret     branch       load        mul  bp_dir_ms  bp_tgt_ms   md_stall    ic_miss    dc_miss
+
+gain           233730      57295      12258       4098       4096       4128       8194      12313          2          3
+
+vfilter        165844     139795       7938       8192          0       7863          3          0          2         89
+
+downscale      441341     106002      11298      15625       7812       7858          2      23461          3         22
+
+bgmodel        121627      44372       5128       4608          0       4342          2          0          2       3950
+
+detect         593606     426156      65568      65536          0      32767         34          0          3         31
+
+>>>>>>> Stashed changes
 CHECKSUM,16354626226523808691
