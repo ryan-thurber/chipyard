@@ -1,140 +1,34 @@
-# ECE 462/562 (University of Arizona) - Chipyard Installation Guide and Tutorial
+# ECE 462/562 PIM Project Group Repository
 
-This repository provides the Chipyard/Rocket environment used for
-ECE 462/562 Computer Architecture.
+This repository is a fork of [the base course repository] (https://github.com/tosiron/ua-chipyard/tree/main) for our group to collaborate.
+Go to the class repo if you have any basic questions regarding setup or running base Configurations
 
-(Thanks to Umut for creating the original version of this tutorial!)
+## Basic Workflow
+There are two helper scripts to make working on the project faster, projectDockerCompose.sh and projectEnvSetup.sh
+- projectDockerCompose.sh is run to start the docker container. Right now I just made it to copy any scala configurations from the student-work directory to the course/configs directory. That allows us to keep all our work in the student-work directory. We may expand the script later to do more stuff.
+- projectEnvSetup.sh is run after the above script. It creates the symbolic link to where the dram files are saved in our verilator directory, as well as building and compiling the programs in tests, so we don't need to manually do that every time.
 
-## Requirements
 
-Install:
-
-1. Git
-2. Docker Desktop: [Docker for Windows](https://docs.docker.com/desktop/setup/install/windows-install/) (requires WSL 2); [Docker for Linux](https://docs.docker.com/engine/install/)
-
-## Setup
-
-Clone this repository:
-
+Starting from your ua-chipyard directory run the following commands:
+1. Create the container
 ```bash
-git clone https://github.com/tosiron/ua-chipyard.git
-cd ua-chipyard
+./student-work/projectDockerCompose.sh
 ```
 
-Download the course environment:
-
+2. Run the projectEnvSetup script
 ```bash
-docker compose pull
+../student-work/projectEnvSetup.sh
 ```
 
-Start Chipyard:
-
+3. Source env.sh - I couldn't get this to take effect in the main terminal from a bash script, so you still have to run this command manually.
 ```bash
-docker compose run --rm chipyard
+source env.sh
 ```
 
-Inside the container, verify installation:
-
+4. Now everything is basically setup, follow the instructions from the course to configure and run a simulation. However, I also haven't figured out how to add the needed command line flags to run the sim with dramSim2 automatically, so here's the command to do that.
 ```bash
-/workspace/test-install.sh
+./simulator-chipyard.harness-[ConfigYouWantToSimulate] +permissive +dramsim +permissive-off [PathTo.riscvExecutable]
 ```
 
-You should see:
-
-```text
-Environment: PASS
-```
-
-## Using Course and Custom Chipyard Configurations
-
-The Docker image contains the fixed Chipyard environment and toolchain. Course configuration files are **not built into the Docker image**. Instead, they are provided through this Git repository and automatically made available to Chipyard when the container starts.
-
-### Getting New Course Configurations
-
-When a new configuration is released, update your local repository:
-
-```bash
-git pull
-```
-
-Then start the environment normally:
-
-```bash
-docker compose run --rm chipyard
-```
-
-The startup script automatically makes all instructor-provided `.scala` files in:
-
-```text
-course/configs/
-```
-
-available to Chipyard. **You do not need to rebuild or re-download the Docker image when a new course configuration is released.**
-
-For example, if `git pull` adds:
-
-```text
-course/configs/CourseCacheConfig.scala
-```
-
-you can build it inside the container with:
-
-```bash
-cd /workspace/chipyard/sims/verilator
-make CONFIG=CourseCacheConfig
-```
-
-### Adding Your Own Configuration
-
-Student-created or modified Scala configurations should be stored somewhere under:
-
-```text
-student-work/
-```
-
-For example:
-
-```text
-student-work/lab4/MyCacheConfig.scala
-```
-
-Do **not** modify the instructor files in `course/configs/`.
-
-When the container starts, the course setup automatically makes student `.scala` configuration files under `student-work/` available to Chipyard.
-
-After adding a new configuration, restart the container:
-
-```bash
-docker compose run --rm chipyard
-```
-
-Then build your configuration normally:
-
-```bash
-cd /workspace/chipyard/sims/verilator
-make CONFIG=MyCacheConfig
-```
-
-You can check that Chipyard recognizes your configuration with:
-
-```bash
-make find-configs
-```
-
-### When Do I Need a New Docker Image?
-
-Normally, you don't.
-
-| Change                                 | What to do                                                 |
-| -------------------------------------- | ---------------------------------------------------------- |
-| New course configuration               | `git pull`                                                 |
-| Updated course configuration           | `git pull`                                                 |
-| New assignment or benchmark            | `git pull`                                                 |
-| Your own Scala configuration           | Put it in `student-work/` and restart the container        |
-| Updated Chipyard/toolchain environment | `git pull` followed by `docker compose pull` if instructed |
-
-Only download a new Docker image when explicitly instructed to do so.
-
-Now, you may continue to:
-
-[Getting Started](/docs/getting-started.md)
+## Things to remember
+If you create a new configuration or change a configuration name, you'll need to update projectDockerCompose.sh to make sure you copy the config into the course/configs directory.
