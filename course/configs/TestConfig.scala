@@ -9,6 +9,7 @@ import org.chipsalliance.cde.config._
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.rocket._
 import freechips.rocketchip.tile._
+import testchipip.dram._
 
 
 // ---------------------------------------------------------------------------
@@ -89,5 +90,6 @@ class TestConfig extends Config(
   new chipyard.config.WithNPerfCounters(8) ++
   new chipyard.config.WithBroadcastManager ++
   new WithTestBaselineCore(1) ++
-  new chipyard.config.AbstractConfig)
+  new chipyard.config.AbstractConfig
+)
 
