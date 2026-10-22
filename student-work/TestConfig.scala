@@ -39,7 +39,7 @@ class WithTestBaselineCore(
     val baseline = RocketTileParams(
       core = RocketCoreParams(
         fpu = Some(FPUParams(
-          minFLen = 64,
+          minFLen = 32,
           fLen = 64,
           divSqrt = true,
           sfmaLatency = 3,
