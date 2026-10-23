@@ -81,14 +81,13 @@ class WithTestBaselineCore(
     ))
 }
 
-/** No branch prediction, no FPU, no L2, 4 KiB direct-mapped L1s.
+/** No branch prediction, we have an FPU, no L2, 4 KiB direct-mapped L1s.
   *
   * chipyard.config.WithBroadcastManager replaces the 512 KiB inclusive LLC
   * that AbstractConfig instantiates with a bufferless broadcast coherence hub,
   * which keeps the DRAM port working but adds no last-level cache. */
 class TestConfig extends Config(
   new chipyard.config.WithNPerfCounters(8) ++
-  new chipyard.config.WithBroadcastManager ++
   new WithTestBaselineCore(1) ++
   new chipyard.config.AbstractConfig
 )

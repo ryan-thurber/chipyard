@@ -13,6 +13,7 @@ services:
       - ./student-work:/workspace/student-work
       - ./course:/workspace/course:ro
       - ./scripts:/workspace/course-scripts:ro
+      - ~/.ssh:/root/.ssh:ro
 
     entrypoint:
       - /workspace/course-scripts/course-entrypoint.sh
