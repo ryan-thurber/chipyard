@@ -87,6 +87,7 @@ class WithTestBaselineCore(
   * that AbstractConfig instantiates with a bufferless broadcast coherence hub,
   * which keeps the DRAM port working but adds no last-level cache. */
 class TestConfig extends Config(
+  new chipyard.example.WithTestDMA(0x80000000L, 0x400000L) ++
   new chipyard.config.WithNPerfCounters(8) ++
   new WithTestBaselineCore(1) ++
   new chipyard.config.AbstractConfig
