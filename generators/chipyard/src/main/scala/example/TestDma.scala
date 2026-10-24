@@ -8,18 +8,18 @@ import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp, IdRange}
 import freechips.rocketchip.tilelink._
 import testchipip.soc.{SubsystemInjector, SubsystemInjectorKey}
 
-case class InitZeroConfig(base: BigInt, size: BigInt)
-case object InitZeroKey extends Field[Option[InitZeroConfig]](None)
+case class TestDMAConfig(base: BigInt, size: BigInt)
+case object TestDMAKey extends Field[Option[TestDMAConfig]](None)
 
-class InitZero(implicit p: Parameters) extends LazyModule {
+class TestDMA(implicit p: Parameters) extends LazyModule {
   val node = TLClientNode(Seq(TLMasterPortParameters.v1(Seq(TLClientParameters(
-    name = "init-zero", sourceId = IdRange(0, 1))))))
+    name = "test-dma", sourceId = IdRange(0, 1))))))
 
-  lazy val module = new InitZeroModuleImp(this)
+  lazy val module = new TestDMAModuleImp(this)
 }
 
-class InitZeroModuleImp(outer: InitZero) extends LazyModuleImp(outer) {
-  val config = p(InitZeroKey).get
+class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
+  val config = p(TestDMAKey).get
 
   val (mem, edge) = outer.node.out(0)
   val addrBits = edge.bundle.addressBits
@@ -58,19 +58,19 @@ class InitZeroModuleImp(outer: InitZero) extends LazyModuleImp(outer) {
   }
 }
 
-case object InitZeroInjector extends SubsystemInjector((p, baseSubsystem) => {
-  p(InitZeroKey) .map { k =>
+case object TestDMAInjector extends SubsystemInjector((p, baseSubsystem) => {
+  p(TestDMAKey) .map { k =>
     implicit val q: Parameters = p
     val fbus = baseSubsystem.locateTLBusWrapper(FBUS)
-    val initZero = fbus { LazyModule(new InitZero()(p)) }
-    fbus.coupleFrom("init-zero") { _ := initZero.node }
+    val TestDMA = fbus { LazyModule(new TestDMA()(p)) }
+    fbus.coupleFrom("test-dma") { _ := TestDMA.node }
   }
 })
 
 
-// DOC include start: WithInitZero
-class WithInitZero(base: BigInt, size: BigInt) extends Config((site, here, up) => {
-  case InitZeroKey => Some(InitZeroConfig(base, size))
-  case SubsystemInjectorKey => up(SubsystemInjectorKey) + InitZeroInjector
+// DOC include start: WithTestDMA
+class WithTestDMA(base: BigInt, size: BigInt) extends Config((site, here, up) => {
+  case TestDMAKey => Some(TestDMAConfig(base, size))
+  case SubsystemInjectorKey => up(SubsystemInjectorKey) + TestDMAInjector
 })
-// DOC include end: WithInitZero
+// DOC include end: WithTestDMA
