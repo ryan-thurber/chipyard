@@ -38,7 +38,7 @@ class InitZeroModuleImp(outer: InitZero) extends LazyModuleImp(outer) {
     fromSource = 0.U,
     toAddress = addr,
     lgSize = log2Ceil(blockBytes).U,
-    data = 0.U)._2
+    data = 170.U)._2
   mem.d.ready := state === s_resp
 
   when (state === s_init) {
