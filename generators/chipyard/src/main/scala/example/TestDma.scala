@@ -55,10 +55,7 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
       RegField(1, dma_stat(0)), // Begin
       RegField(1, dma_stat(1)), // Busy
       RegField(1, dma_stat(2)), // Done
-      RegField(1, dma_stat(3), RegWriteFn((valid, data) => {
-        when(valid && data === 1.U) { dma_stat(3) := false.B }
-        true.B
-      }))
+      RegField(1, dma_stat(3))
     ),
     0x18 -> Seq(RegField(1, int_enable))
   )
