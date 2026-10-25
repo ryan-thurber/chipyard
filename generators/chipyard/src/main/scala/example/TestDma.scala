@@ -29,7 +29,7 @@ class TestDMA(params: TestDMAParams)(implicit p: Parameters) extends LazyModule 
   val dmaNode = TLClientNode(Seq(TLMasterPortParameters.v1(Seq(TLClientParameters(
     name = "test-dma", sourceId = IdRange(0, 1))))))
 
-  val intNode = IntSourceNode(Seq(IntSourcePortParameters(range = IntRange(0))))
+  val intNode = IntSourceNode(IntSourcePortSimple())
 
   lazy val module = new TestDMAModuleImp(this)
 }
