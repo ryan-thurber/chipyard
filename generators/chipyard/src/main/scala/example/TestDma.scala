@@ -57,7 +57,7 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
       RegField(1, dma_stat(2)), // Done
       RegField(1, dma_stat(3))
     ),
-    0x18 -> Seq(RegField(1, int_enable))
+    0x18 -> Seq(RegField(1, int_enable, RegFieldDesc("int_enable", "I don't remember right now")))
   )
 
   val s_idle :: s_read_req :: s_read_resp :: s_write_req :: s_write_resp :: s_done :: Nil = Enum(6)
@@ -66,7 +66,7 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
   val dataBuffer = Reg(UInt(64.W))
   val bytesRemaining = RegInit(0.U(32.W))
   
-  // irqWire := dma_stat(3) && int_enable
+  irqWire := dma_stat(3) && int_enable
 
   switch(state) {
 
