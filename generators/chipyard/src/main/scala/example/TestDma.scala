@@ -52,10 +52,11 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
     0x08 -> Seq(RegField(64, dst_addr, RegFieldDesc("dst_addr", "DMA Destination Address"))),
     0x10 -> Seq(RegField(32, tx_len,   RegFieldDesc("tx_len", "Transaction Length"))),
     0x14 -> Seq(
-      RegField(1, dma_stat(0)), // Busy
-      RegField(1, dma_stat(1)), // Done
-      RegField(1, dma_stat(2), RegWriteFn((valid, data) => {
-        when(valid && data === 1.U) { dma_stat(2) := false.B }
+      RegField(1, dma_stat(0)), // Begin
+      RegField(1, dma_stat(1)), // Busy
+      RegField(1, dma_stat(2)), // Done
+      RegField(1, dma_stat(3), RegWriteFn((valid, data) => {
+        when(valid && data === 1.U) { dma_stat(3) := false.B }
         true.B
       }))
     ),
@@ -70,17 +71,18 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
 
   val startTrigger = io.core_or_mmio_write_event
   
-  irqWire := dma_stat(2) && int_enable
+  irqWire := dma_stat(3) && int_enable
 
   switch(state) {
 
     is(s_idle) {
-      dma_stat(0) := false.B
-      when(startTrigger) {
+      dma_stat(1) := false.B
+      when(dma_stat(0)) {
         bytesRemaining := tx_len
-        dma_stat(0) := true.B
-        dma_stat(1) := false.B
+        dma_stat(0) := false.B
+        dma_stat(1) := true.B
         dma_stat(2) := false.B
+        dma_stat(3) := false.B
         state := s_read_req
       }
     }
@@ -135,9 +137,9 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
     }
 
     is(s_done) {
-      dma_stat(0) := false.B
-      dma_stat(1) := true.B
+      dma_stat(1) := false.B
       dma_stat(2) := true.B
+      dma_stat(3) := true.B
       state := s_idle
     }
   }
@@ -147,7 +149,7 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
 trait CanHavePeripheryTestDMA { this: BaseSubsystem =>
   
   private val pbus = locateTLBusWrapper(PBUS)
-  private val fbus = baseSubsystem.locateTLBusWrapper(FBUS)
+  private val fbus = locateTLBusWrapper(FBUS)
 
   p(TestDMAKey).foreach { params =>
     val testDMA = LazyModule(new TestDMA(params))
