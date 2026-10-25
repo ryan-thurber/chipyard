@@ -39,13 +39,13 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
   val (dmaOut, dmaEdge) = outer.dmaNode.out(0)
 
   val (interrupts, _) = outer.intNode.out(0)
-  val irqWire = interrupts(0)
+  //val irqWire = interrupts(0)
 
   val src_addr = RegInit(0.U(64.W))
   val dst_addr = RegInit(0.U(64.W))
   val tx_len   = RegInit(0.U(32.W))
   val dma_stat = RegInit(0.U(32.W))
-  val int_enable = RegInit(false.B)
+  //val int_enable = RegInit(false.B)
 
   outer.mmioNode.regmap(
     0x00 -> Seq(RegField(64, src_addr, RegFieldDesc("src_addr", "DMA Source Address"))),
@@ -57,7 +57,7 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
       RegField(1, dma_stat(2)), // Done
       RegField(1, dma_stat(3))
     ),
-    0x18 -> Seq(RegField(1, int_enable, RegFieldDesc("int_enable", "I don't remember right now")))
+    //0x18 -> Seq(RegField(1, int_enable, RegFieldDesc("int_enable", "I don't remember right now")))
   )
 
   val s_idle :: s_read_req :: s_read_resp :: s_write_req :: s_write_resp :: s_done :: Nil = Enum(6)
@@ -66,7 +66,7 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
   val dataBuffer = Reg(UInt(64.W))
   val bytesRemaining = RegInit(0.U(32.W))
   
-  irqWire := dma_stat(3) && int_enable
+  //irqWire := dma_stat(3) && int_enable
 
   switch(state) {
 
