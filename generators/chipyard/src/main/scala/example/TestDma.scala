@@ -11,6 +11,12 @@ import testchipip.soc.{SubsystemInjector, SubsystemInjectorKey}
 
 case class TestDMAParams(baseAddress: BigInt, beatBytes: Int = 8)
 
+case object TestDMAKey extends Field[Option[TestDMAParams]](None)
+
+class WithTestDMA(baseAddress: BigInt = 0x20000000) extends Config((site, here, up) => {
+  case TestDMAKey => Some(TestDMAParams(baseAddress = baseAddress))
+})
+
 class TestDMA(params: TestDMAParams)(implicit p: Parameters) extends LazyModule {
 
   val mmioNode = TLRegisterNode(
@@ -138,13 +144,13 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
 }
 
 trait CanHavePeripheryTestDMA { this: BaseSubsystem =>
-  val testDMA = LazyModule(new TestDMA(TestDMAParams(baseAddress = 0x20000000, beatBytes = pbus.beatBytes)))
 
-  pbus.coupleTo("testdma-cfg") { testDMA.mmioNode := TLFragmenter(pbus.beatBytes, pbus.blockBytes) := _ }
-
-  fbus.coupleFrom("testdma-stream") { _ := testDMA.dmaNode }
-
-  ibus.fromSync := testDMA.intNode
+  p(TestDMAKey).foreach { params =>
+    val testDMA = LazyModule(new TestDMA(params))
+    pbus.coupleTo("testdma-cfg") { testDMA.mmioNode := TLFragmenter(pbus.beatBytes, pbus.blockBytes) := _ }
+    fbus.coupleFrom("testdma-stream") { _ := testDMA.dmaNode }
+    ibus.fromSync := testDMA.intNode
+  }
 }
 
                               
