@@ -68,8 +68,6 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
 
   val dataBuffer = Reg(UInt(64.W))
   val bytesRemaining = RegInit(0.U(32.W))
-
-  val startTrigger = io.core_or_mmio_write_event
   
   irqWire := dma_stat(3) && int_enable
 
