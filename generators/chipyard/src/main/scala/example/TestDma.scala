@@ -1,11 +1,10 @@
 package chipyard.example
 
-import amba.axi4._
 import chisel3._
 import chisel3.util._
 import freechips.rocketchip.subsystem._
 import org.chipsalliance.cde.config.{Parameters, Field, Config}
-import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp, IdRange}
+import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 import testchipip.soc.{SubsystemInjector, SubsystemInjectorKey}
 
