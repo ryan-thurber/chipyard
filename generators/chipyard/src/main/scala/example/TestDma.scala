@@ -7,6 +7,7 @@ import freechips.rocketchip.subsystem._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.interrupts._
+import freechips.rocketchip.regmapper._
 import testchipip.soc.{SubsystemInjector, SubsystemInjectorKey}
 
 case class TestDMAParams(baseAddress: BigInt, beatBytes: Int = 8)
@@ -28,7 +29,7 @@ class TestDMA(params: TestDMAParams)(implicit p: Parameters) extends LazyModule 
   val dmaNode = TLClientNode(Seq(TLMasterPortParameters.v1(Seq(TLClientParameters(
     name = "test-dma", sourceId = IdRange(0, 1))))))
 
-  val intNode = IntSourceNode(IntSourceParameters(range = IntRange(0)))
+  val intNode = IntSourceNode(Seq(IntSourceParameters(range = IntRange(0))))
 
   lazy val module = new TestDMAModuleImp(this)
 }
