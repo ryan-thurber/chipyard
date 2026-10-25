@@ -22,24 +22,37 @@ class TestDMA(params: TestDMAParams)(implicit p: Parameters) extends LazyModule 
   val dmaNode = TLClientNode(Seq(TLMasterPortParameters.v1(Seq(TLClientParameters(
     name = "test-dma", sourceId = IdRange(0, 1))))))
 
+  val intNode = IntSourceNode(IntSourceParameters(num = 1)
+
   lazy val module = new TestDMAModuleImp(this)
 }
 
 class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
 
   val (dmaOut, dmaEdge) = outer.dmaNode.out(0)
-  val config = p(TestDMAKey).get
+
+  val (interrupts, _) = outer.intNode.out(0)
+  val irqWire = interrupts(0)
 
   val src_addr = RegInit(0.U(64.W))
   val dst_addr = RegInit(0.U(64.W))
   val tx_len   = RegInit(0.U(32.W))
   val dma_stat = RegInit(0.U(32.W))
+  val int_enable = RegInit(false.B)
 
   outer.mmioNode.regmap(
     0x00 -> Seq(RegField(64, src_addr, RegFieldDesc("src_addr", "DMA Source Address"))),
     0x08 -> Seq(RegField(64, dst_addr, RegFieldDesc("dst_addr", "DMA Destination Address"))),
     0x10 -> Seq(RegField(32, tx_len,   RegFieldDesc("tx_len", "Transaction Length"))),
-    0x14 -> Seq(RegField(32, dma_stat, RegFieldDesc("dma_stat", "DMA Status"))),
+    0x14 -> Seq(
+      RegField.rw(1, dma_stat(0)), // Busy
+      RegField.rw(1, dma_stat(1)), // Done
+      RegField(1, dma_stat(2), RegFieldFn((valid, data) => {
+        when(valid && data === 1.U) { dma_stat(2) := false.B }
+        true.B
+      }))
+    ),
+    0x18 -> Seq(RegField.rw(1, int_enable))
   )
 
   val s_idle :: s_read_req :: s_read_resp :: s_write_req :: s_write_resp :: s_done :: Nil = Enum(6)
@@ -49,14 +62,18 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
   val bytesRemaining = RegInit(0.U(32.W))
 
   val startTrigger = io.core_or_mmio_write_event
+  
+  irqWire := dma_stat(2) && int_enable
 
   switch(state) {
 
     is(s_idle) {
-      status := 0.U
+      dma_stat(0) := false.B
       when(startTrigger) {
         bytesRemaining := tx_len
-        status := 1.U
+        dma_stat(0) := true.B
+        dma_stat(1) := false.B
+        dma_stat(2) := false.B
         state := s_read_req
       }
     }
@@ -111,10 +128,13 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
     }
 
     is(s_done) {
-      status := 2.U
+      dma_stat(0) := false.B
+      dma_stat(1) := true.B
+      dma_stat(2) := true.B
       state := s_idle
     }
   }
+
 }
 
 trait CanHavePeripheryTestDMA { this: BaseSubsystem =>
@@ -124,7 +144,7 @@ trait CanHavePeripheryTestDMA { this: BaseSubsystem =>
 
   fbus.coupleFrom("testdma-stream") { _ := testDMA.dmaNode }
 
+  ibus.fromSync := testDMA.intNode
 }
 
-
-  
+                              
