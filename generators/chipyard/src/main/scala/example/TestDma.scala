@@ -1,5 +1,6 @@
 package chipyard.example
 
+import amba.axi4._
 import chisel3._
 import chisel3.util._
 import freechips.rocketchip.subsystem._
@@ -8,15 +9,14 @@ import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp, IdRange}
 import freechips.rocketchip.tilelink._
 import testchipip.soc.{SubsystemInjector, SubsystemInjectorKey}
 
-case class TestDMAConfig(base: BigInt, size: BigInt)
-case object TestDMAKey extends Field[Option[TestDMAConfig]](None)
+case class TestDMAParams(baseAddress: BigInt, beatBytes: Int = 8)
 
-class TestDMA(implicit p: Parameters) extends LazyModule {
+class TestDMA(params: TestDMAParams)(implicit p: Parameters) extends LazyModule {
 
   val mmioNode = TLRegisterNode(
-    address = Seq(AddressSet(0x10030000, 0xfff)),
+    address = Seq(AddressSet(params.baseAddress, 0xfff)),
     device = new SimpleDevice("test-dma-device", Seq("ua,test-dma-device")),
-    beatBytes = 8,
+    beatBytes = params.beatBytes,
     )
     
   val dmaNode = TLClientNode(Seq(TLMasterPortParameters.v1(Seq(TLClientParameters(
@@ -26,70 +26,105 @@ class TestDMA(implicit p: Parameters) extends LazyModule {
 }
 
 class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
+
+  val (dmaOut, dmaEdge) = outer.dmaNode.out(0)
   val config = p(TestDMAKey).get
 
-  val dma_addr = RegInit(0.U(64.W))
-  val dma_len  = RegInit(0.U(32.W))
-  val dma_run  = RegInit(false.B)
-  val dma_busy = Wire(Bool())
+  val src_addr = RegInit(0.U(64.W))
+  val dst_addr = RegInit(0.U(64.W))
+  val tx_len   = RegInit(0.U(32.W))
+  val dma_stat = RegInit(0.U(32.W))
 
-  mmioNode.regmap(
-    0x00 -> Seq(RegField(64, dma_addr, RegFieldDesc("dma_addr", "DMA Source/Dest Addres"))),
-    0x08 -> Seq(RegField(32, dma_len,  RegFieldDesc("dma_len",   "DMA Transfer Length"))),
-    0x0C -> Seq(RegField.w1ToClear(1, dma_run, dma_busy, Some(RegFieldDesc("dma_run", "Write 1 to trigger")))),
-    0x10 -> Seq(RegField.r(1, dma_busy, RegFieldDesc("dma_busy", "Status flag")))
+  outer.mmioNode.regmap(
+    0x00 -> Seq(RegField(64, src_addr, RegFieldDesc("src_addr", "DMA Source Address"))),
+    0x08 -> Seq(RegField(64, dst_addr, RegFieldDesc("dst_addr", "DMA Destination Address"))),
+    0x10 -> Seq(RegField(32, tx_len,   RegFieldDesc("tx_len", "Transaction Length"))),
+    0x14 -> Seq(RegField(32, dma_stat, RegFieldDesc("dma_stat", "DMA Status"))),
   )
 
-  val (mem, edge) = dmaNode.out(0)
-  val addrBits = edge.bundle.addressBits
-  val blockBytes = p(CacheBlockBytes)
+  val s_idle :: s_read_req :: s_read_resp :: s_write_req :: s_write_resp :: s_done :: Nil = Enum(6)
+  val state = RegInit(s_idle)
 
-  require(config.size % blockBytes == 0)
+  val dataBuffer = Reg(Uint(64.W))
+  val bytesRemaining = RegInit(0.U(32.W))
 
-  val s_init :: s_write :: s_resp :: s_done :: Nil = Enum(4)
-  val state = RegInit(s_init)
+  val startTrigger = io.core_or_mmio_write_event
 
-  val addr = Reg(UInt(addrBits.W))
-  val bytesLeft = Reg(UInt(log2Ceil(config.size+1).W))
+  switch(state) {
 
-  mem.a.valid := state === s_write
-  mem.a.bits := edge.Put(
-    fromSource = 0.U,
-    toAddress = addr,
-    lgSize = log2Ceil(blockBytes).U,
-    data = 170.U)._2
-  mem.d.ready := state === s_resp
+    is(s_idle) {
+      status := 0.U
+      when(startTrigger) {
+        bytesRemaining := tx_len
+        status := 1.U
+        state := s_read_req
+      }
+    }
 
-  when (state === s_init) {
-    addr := config.base.U
-    bytesLeft := config.size.U
-    state := s_write
-  }
+    is(s_read_req) {
+      dmaOut.a.valid := true.B
+      dmaOut.a.bits  := dmaEdge.Get(
+        fromSource = 0.U,
+        toAddress = src_addr,
+        lgSize = 3.U
+        )._2
 
-  when (edge.done(mem.a)) {
-    addr := addr + blockBytes.U
-    bytesLeft := bytesLeft - blockBytes.U
-    state := s_resp
-  }
+      when(dmaOut.a.read) {
+        state := s_read_resp
+      }
+    }
 
-  when (mem.d.fire) {
-    state := Mux(bytesLeft === 0.U, s_done, s_write)
+    is(s_read_resp) {
+      dmaOut.d.ready := true.B
+      when(dmaOut.d.valid) {
+        dataBuffer := dmaOut.d.bits.data
+        src_addr := src_addr + 8.U
+        state := s_write_req
+      }
+    }
+
+    is(s_write_req) {
+      dmaOut.a.valid := true.B
+      dmaOut.a.bits := dmaEdge.Put(
+        fromSource = 0.U,
+        toAddress = dst_addr,
+        lgSize = 3.U,
+        data = dataBuffer
+        )._2
+
+      when(dmaOut.a.read) {
+        state := s_write_resp
+      }
+    }
+
+    is(s_write_resp) {
+      dmaOut.d.ready := true.B
+      when(dmaOut.d.valid) {
+        dst_addr := dst_addr + 8.U
+        when(bytesRemaining <= 8.U) {
+          state := s_done
+        }.otherwise {
+          bytesRemaining := bytesRemaining - 8.U
+          state := s_read_req
+        }
+      }
+    }
+
+    is(s_done) {
+      status := 2.U
+      state := s_idle
+    }
   }
 }
 
-case object TestDMAInjector extends SubsystemInjector((p, baseSubsystem) => {
-  p(TestDMAKey) .map { k =>
-    implicit val q: Parameters = p
-    val fbus = baseSubsystem.locateTLBusWrapper(FBUS)
-    val TestDMA = fbus { LazyModule(new TestDMA()(p)) }
-    fbus.coupleFrom("test-dma") { _ := TestDMA.node }
-  }
-})
+trait CanHavePeripheryTestDMA { this: BaseSubsystem =>
+  val testDMA = LazyModule(new TestDMA(TestDMAParams(baseAddress = 0x20000000, beatBytes = pbus.beatBytes)))
+
+  pbus.coupleTo("testdma-cfg") { testDMA.mmioNode := TLFragmenter(pbus.beatBytes, pbus.blockBytes) := _ }
+
+  fbus.coupleFrom("testdma-stream") { _ := testDMA.dmaNode }
+
+}
 
 
-// DOC include start: WithTestDMA
-class WithTestDMA(base: BigInt, size: BigInt) extends Config((site, here, up) => {
-  case TestDMAKey => Some(TestDMAConfig(base, size))
-  case SubsystemInjectorKey => up(SubsystemInjectorKey) + TestDMAInjector
-})
-// DOC include end: WithTestDMA
+  
