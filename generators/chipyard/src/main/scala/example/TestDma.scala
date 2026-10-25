@@ -12,7 +12,14 @@ case class TestDMAConfig(base: BigInt, size: BigInt)
 case object TestDMAKey extends Field[Option[TestDMAConfig]](None)
 
 class TestDMA(implicit p: Parameters) extends LazyModule {
-  val node = TLClientNode(Seq(TLMasterPortParameters.v1(Seq(TLClientParameters(
+
+  val mmioNode = TLRegisterNode(
+    address = Seq(AddressSet(0x10030000, 0xfff)),
+    device = new SimpleDevice("test-dma-device", Seq("ua,test-dma-device")),
+    beatBytes = 8,
+    )
+    
+  val dmaNode = TLClientNode(Seq(TLMasterPortParameters.v1(Seq(TLClientParameters(
     name = "test-dma", sourceId = IdRange(0, 1))))))
 
   lazy val module = new TestDMAModuleImp(this)
@@ -21,7 +28,19 @@ class TestDMA(implicit p: Parameters) extends LazyModule {
 class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
   val config = p(TestDMAKey).get
 
-  val (mem, edge) = outer.node.out(0)
+  val dma_addr = RegInit(0.U(64.W))
+  val dma_len  = RegInit(0.U(32.W))
+  val dma_run  = RegInit(false.B)
+  val dma_busy = Wire(Bool())
+
+  mmioNode.regmap(
+    0x00 -> Seq(RegField(64, dma_addr, RegFieldDesc("dma_addr", "DMA Source/Dest Addres"))),
+    0x08 -> Seq(RegField(32, dma_len,  RegFieldDesc("dma_len",   "DMA Transfer Length"))),
+    0x0C -> Seq(RegField.w1ToClear(1, dma_run, dma_busy, Some(RegFieldDesc("dma_run", "Write 1 to trigger")))),
+    0x10 -> Seq(RegField.r(1, dma_busy, RegFieldDesc("dma_busy", "Status flag")))
+  )
+
+  val (mem, edge) = dmaNode.out(0)
   val addrBits = edge.bundle.addressBits
   val blockBytes = p(CacheBlockBytes)
 
