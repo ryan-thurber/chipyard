@@ -52,20 +52,20 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
     0x08 -> Seq(RegField(64, dst_addr, RegFieldDesc("dst_addr", "DMA Destination Address"))),
     0x10 -> Seq(RegField(32, tx_len,   RegFieldDesc("tx_len", "Transaction Length"))),
     0x14 -> Seq(
-      RegField.rw(1, dma_stat(0)), // Busy
-      RegField.rw(1, dma_stat(1)), // Done
+      RegField.rwReg(1, dma_stat(0)), // Busy
+      RegField.rwReg(1, dma_stat(1)), // Done
       RegField(1, dma_stat(2), RegFieldFn((valid, data) => {
         when(valid && data === 1.U) { dma_stat(2) := false.B }
         true.B
       }))
     ),
-    0x18 -> Seq(RegField.rw(1, int_enable))
+    0x18 -> Seq(RegField.rwReg(1, int_enable))
   )
 
   val s_idle :: s_read_req :: s_read_resp :: s_write_req :: s_write_resp :: s_done :: Nil = Enum(6)
   val state = RegInit(s_idle)
 
-  val dataBuffer = Reg(Uint(64.W))
+  val dataBuffer = Reg(UInt(64.W))
   val bytesRemaining = RegInit(0.U(32.W))
 
   val startTrigger = io.core_or_mmio_write_event
@@ -93,7 +93,7 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
         lgSize = 3.U
         )._2
 
-      when(dmaOut.a.read) {
+      when(dmaOut.a.ready) {
         state := s_read_resp
       }
     }
@@ -116,7 +116,7 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
         data = dataBuffer
         )._2
 
-      when(dmaOut.a.read) {
+      when(dmaOut.a.ready) {
         state := s_write_resp
       }
     }
