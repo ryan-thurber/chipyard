@@ -2,10 +2,11 @@ package chipyard.example
 
 import chisel3._
 import chisel3.util._
-import freechips.rocketchip.subsystem._
 import org.chipsalliance.cde.config.{Parameters, Field, Config}
+import freechips.rocketchip.subsystem._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
+import freechips.rocketchip.interrupts._
 import testchipip.soc.{SubsystemInjector, SubsystemInjectorKey}
 
 case class TestDMAParams(baseAddress: BigInt, beatBytes: Int = 8)
