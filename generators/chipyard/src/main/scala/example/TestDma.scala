@@ -145,6 +145,9 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
 }
 
 trait CanHavePeripheryTestDMA { this: BaseSubsystem =>
+  
+  private val pbus = locateTLBusWrapper(PBUS)
+  private val fbus = baseSubsystem.locateTLBusWrapper(FBUS)
 
   p(TestDMAKey).foreach { params =>
     val testDMA = LazyModule(new TestDMA(params))
