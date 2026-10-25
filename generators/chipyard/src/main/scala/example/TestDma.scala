@@ -52,11 +52,11 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
     0x08 -> Seq(RegField(64, dst_addr, RegFieldDesc("dst_addr", "DMA Destination Address"))),
     0x10 -> Seq(RegField(32, tx_len,   RegFieldDesc("tx_len", "Transaction Length"))),
     0x14 -> Seq(
-      RegField(1, dma_stat(0)), // Begin
-      RegField(1, dma_stat(1)), // Busy
-      RegField(1, dma_stat(2)), // Done
-      RegField(1, dma_stat(3))
-    ),
+      RegField(1, dma_stat(0), RegFieldDesc("dma_stat(0)", "Begin")), // Begin
+      RegField(1, dma_stat(1), RegFieldDesc("dma_stat(1)", "Busy")), // Busy
+      RegField(1, dma_stat(2), RegFieldDesc("dma_stat(2)", "Done")), // Done
+      RegField(1, dma_stat(3), RegFieldDesc("dma_stat(3)", "Don't Remember"))
+    )
     //0x18 -> Seq(RegField(1, int_enable, RegFieldDesc("int_enable", "I don't remember right now")))
   )
 
