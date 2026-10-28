@@ -73,7 +73,7 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
 
     is(s_idle) {
       dma_busy := false.B
-      when(dma_begin) {
+      when(dma_begin.orR) {
         bytesRemaining := tx_len
         dma_busy  := true.B
         dma_done  := false.B
