@@ -41,22 +41,25 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
   val (interrupts, _) = outer.intNode.out(0)
   //val irqWire = interrupts(0)
 
-  val src_addr = RegInit(0.U(64.W))
-  val dst_addr = RegInit(0.U(64.W))
-  val tx_len   = RegInit(0.U(32.W))
-  val dma_stat = RegInit(0.U(32.W))
+  val src_addr  = RegInit(0.U(64.W))
+  val dst_addr  = RegInit(0.U(64.W))
+  val tx_len    = RegInit(0.U(32.W))
+  val dma_begin = RegInit(0.U(8.W))
+  val dma_busy  = RegInit(0.U(8.W))
+  val dma_done  = RegInit(0.U(8.W))
+  val dma_dunno = RegInit(0.U(8.W))
   //val int_enable = RegInit(false.B)
 
   outer.mmioNode.regmap(
-    0x00 -> Seq(RegField(64, src_addr, RegFieldDesc("src_addr", "DMA Source Address"))),
-    0x08 -> Seq(RegField(64, dst_addr, RegFieldDesc("dst_addr", "DMA Destination Address"))),
-    0x10 -> Seq(RegField(32, tx_len,   RegFieldDesc("tx_len", "Transaction Length"))),
-    0x14 -> Seq(
-      RegField(1, dma_stat(0), RegFieldDesc("dma_stat0", "Begin")), // Begin
-      RegField(1, dma_stat(1), RegFieldDesc("dma_stat1", "Busy")), // Busy
-      RegField(1, dma_stat(2), RegFieldDesc("dma_stat2", "Done")), // Done
-      RegField(1, dma_stat(3), RegFieldDesc("dma_stat3", "Don't Remember"))
+    0x00 -> Seq(RegField(64, src_addr,  RegFieldDesc("src_addr",  "DMA source address"))),
+    0x08 -> Seq(RegField(64, dst_addr,  RegFieldDesc("dst_addr",  "DMA destination address"))),
+    0x10 -> Seq(RegField(32, tx_len,    RegFieldDesc("tx_len",    "Transaction length"))),
+    0x14 -> Seq(RegField(8,  dma_begin, RegFieldDesc("dma_begin", "Begin DMA execution"))),
+    0x15 -> Seq(RegField(8,  dma_busy,  RegFieldDesc("dma_busy",  "DMA is executing"))),
+    0x16 -> Seq(RegField(8,  dma_done,  RegFieldDesc("dma_done",  "DMA finished execution"))),
+    0x17 -> Seq(RegField(8,  dma_dunno, RegFieldDesc("dma_dunno", "Don't remember")))
     )
+    
     //0x18 -> Seq(RegField(1, int_enable, RegFieldDesc("int_enable", "I don't remember right now")))
   )
 
@@ -71,13 +74,12 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
   switch(state) {
 
     is(s_idle) {
-      dma_stat(1) := false.B
-      when(dma_stat(0)) {
+      dma_busy := false.B
+      when(dma_begin) {
         bytesRemaining := tx_len
-        dma_stat(0) := false.B
-        dma_stat(1) := true.B
-        dma_stat(2) := false.B
-        dma_stat(3) := false.B
+        dma_busy  := true.B
+        dma_done  := false.B
+        dma_dunno := false.B
         state := s_read_req
       }
     }
@@ -132,9 +134,10 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
     }
 
     is(s_done) {
-      dma_stat(1) := false.B
-      dma_stat(2) := true.B
-      dma_stat(3) := true.B
+      dma_begin := false.B
+      dma_busy  := false.B
+      dma_done  := true.B
+      dma_dunno := true.B
       state := s_idle
     }
   }
