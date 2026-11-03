@@ -54,7 +54,7 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
     0x08 -> Seq(RegField(64, dst_addr,  RegFieldDesc("dst_addr",  "DMA destination address"))),
     0x10 -> Seq(RegField(32, length,    RegFieldDesc("length",    "Transaction length"))),
     0x14 -> Seq(RegField(32, status,    RegFieldDesc("status",    "DMA Status"))),
-    0x15 -> Seq(RegField(1,  control,   RegFieldDesc("control",   "DMA Control"))),
+    0x18 -> Seq(RegField(1,  control,   RegFieldDesc("control",   "DMA Control"))),
     )
 
   val s_idle :: s_read_req :: s_read_resp :: s_write_req :: s_write_resp :: s_done :: Nil = Enum(6)
