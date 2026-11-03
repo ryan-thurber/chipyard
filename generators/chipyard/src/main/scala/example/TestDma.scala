@@ -37,28 +37,24 @@ class TestDMA(params: TestDMAParams)(implicit p: Parameters) extends LazyModule 
 class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
 
   val (dmaOut, dmaEdge) = outer.dmaNode.out(0)
-
   val (interrupts, _) = outer.intNode.out(0)
-  //val irqWire = interrupts(0)
+  
 
   val src_addr  = RegInit(0.U(64.W))
   val dst_addr  = RegInit(0.U(64.W))
-  val tx_len    = RegInit(0.U(32.W))
-  val dma_begin = RegInit(0.U(8.W))
-  val dma_busy  = RegInit(0.U(8.W))
-  val dma_done  = RegInit(0.U(8.W))
-  val dma_dunno = RegInit(0.U(8.W))
-  //val int_enable = RegInit(false.B)
+  val length    = RegInit(0.U(32.W))
+  val status    = RegInit(0.U(32.W))
+  val control   = RegInit(false.B)
+
+  val irqWire = RegInit(false.B)
+  interrupts(0) := irqWire
 
   outer.mmioNode.regmap(
     0x00 -> Seq(RegField(64, src_addr,  RegFieldDesc("src_addr",  "DMA source address"))),
     0x08 -> Seq(RegField(64, dst_addr,  RegFieldDesc("dst_addr",  "DMA destination address"))),
-    0x10 -> Seq(RegField(32, tx_len,    RegFieldDesc("tx_len",    "Transaction length"))),
-    0x14 -> Seq(RegField(8,  dma_begin, RegFieldDesc("dma_begin", "Begin DMA execution"))),
-    0x15 -> Seq(RegField(8,  dma_busy,  RegFieldDesc("dma_busy",  "DMA is executing"))),
-    0x16 -> Seq(RegField(8,  dma_done,  RegFieldDesc("dma_done",  "DMA finished execution"))),
-    0x17 -> Seq(RegField(8,  dma_dunno, RegFieldDesc("dma_dunno", "Don't remember")))
-    //0x18 -> Seq(RegField(1, int_enable, RegFieldDesc("int_enable", "I don't remember right now")))
+    0x10 -> Seq(RegField(32, length,    RegFieldDesc("length",    "Transaction length"))),
+    0x14 -> Seq(RegField(32, status,    RegFieldDesc("status",    "DMA Status"))),
+    0x15 -> Seq(RegField(1,  control,   RegFieldDesc("control",   "DMA Control"))),
     )
 
   val s_idle :: s_read_req :: s_read_resp :: s_write_req :: s_write_resp :: s_done :: Nil = Enum(6)
@@ -66,18 +62,14 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
 
   val dataBuffer = Reg(UInt(64.W))
   val bytesRemaining = RegInit(0.U(32.W))
-  
-  //irqWire := dma_stat(3) && int_enable
 
   switch(state) {
 
     is(s_idle) {
-      dma_busy := false.B
-      when(dma_begin.orR) {
-        bytesRemaining := tx_len
-        dma_busy  := true.B
-        dma_done  := false.B
-        dma_dunno := false.B
+      status := 0.U
+      when(control === true.B) {
+        bytesRemaining := length
+        status  := 1.U
         state := s_read_req
       }
     }
@@ -132,11 +124,10 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
     }
 
     is(s_done) {
-      dma_begin := false.B
-      dma_busy  := false.B
-      dma_done  := true.B
-      dma_dunno := true.B
-      state := s_idle
+      status  := 0.U
+      control := false.B
+      irqWire := true.B
+      state   := s_idle
     }
   }
 
