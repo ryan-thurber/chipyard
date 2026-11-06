@@ -79,7 +79,7 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
       dmaOut.a.bits  := dmaEdge.Get(
         fromSource = 0.U,
         toAddress = src_addr,
-        lgSize = 3.U
+        lgSize = 4.U
         )._2
 
       when(dmaOut.a.ready) {
@@ -101,7 +101,7 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
       dmaOut.a.bits := dmaEdge.Put(
         fromSource = 0.U,
         toAddress = dst_addr,
-        lgSize = 3.U,
+        lgSize = 4.U,
         data = dataBuffer
         )._2
 
