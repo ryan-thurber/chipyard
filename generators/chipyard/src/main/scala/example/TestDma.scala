@@ -139,7 +139,7 @@ trait CanHavePeripheryTestDMA { this: BaseSubsystem =>
   private val fbus = locateTLBusWrapper(FBUS)
 
   p(TestDMAKey).foreach { params =>
-    val testDMA = LazyModule(new TestDMA(params))
+    val testDMA = fbus { LazyModule(new TestDMA(params)) }
     pbus.coupleTo("testdma-cfg") { testDMA.mmioNode := TLFragmenter(pbus.beatBytes, pbus.blockBytes) := _ }
     fbus.coupleFrom("testdma-stream") { _ := testDMA.dmaNode }
     ibus.fromSync := testDMA.intNode
