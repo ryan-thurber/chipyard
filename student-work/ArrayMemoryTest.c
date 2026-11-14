@@ -20,12 +20,12 @@
 volatile int dma_completed = 0;
 
 
-void __attribute__((interrupt)) handl_trap(void) {
+void __attribute__((interrupt)) handle_trap(void) {
 	
 	uintptr_t mcause = read_csr(mcause);
     
     // Check if it's a Machine External Interrupt (PLIC)
-    if ((mcause & MCAUSE_INT) && ((mcause & 0x7F) == IRQ_M_EXT)) {
+    if (mcause && ((mcause & 0x7F) == IRQ_M_EXT)) {
         // Claim the PLIC interrupt
         uint32_t int_id = *(volatile uint32_t*)PLIC_CLAIM;
         
@@ -59,8 +59,8 @@ int main(void) {
     // 5. Trigger the DMA
     *(volatile uint32_t*)DMA_SRC_REG = (uintptr_t)src_buf;
     *(volatile uint32_t*)DMA_DST_REG = (uintptr_t)dst_buf;
-    *(volatile uint32_t*)DMA_LEN_REG = sizeof(src_buf);
-    *(volatile uint32_t*)DMA_CMD_REG = 0x3; // Bit 0 (Start) | Bit 1 (Interrupt Enable)
+    *(volatile uint32_t*)DMA_LENGTH = sizeof(src_buf);
+    *(volatile uint32_t*)DMA_CONTROL = 0x3; // Bit 0 (Start) | Bit 1 (Interrupt Enable)
 
     // 6. Wait for the interrupt to modify the flag
     while (!dma_completed) {
