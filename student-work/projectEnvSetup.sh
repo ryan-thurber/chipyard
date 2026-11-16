@@ -8,6 +8,9 @@ git fetch project
 git config --global user.email "kmunifahmed@arizona.edu"
 git config --global user.name "Khandoker Munif Ahmed"
 
+# Copy files into necessary spaces
+cp /workspace/student-work/DMA/* /workspace/chipyard/generators/chipyard/src/main/scala/example/
+
 # Setup the symbolic link to get dramSim2 to work
 ln -s /workspace/chipyard/generators/testchipip/src/main/resources/dramsim2_ini/ /workspace/chipyard/sims/verilator/dramsim2_ini
 
