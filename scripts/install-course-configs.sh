@@ -21,4 +21,16 @@ for file in "$SRC"/*.scala; do
     fi
 done
 
+# Student-owned configs are linked too, so they remain stored under the
+# repository's writable student-work mount while Chipyard can discover them.
+STUDENT_SRC="/workspace/student-work"
+if [ -d "$STUDENT_SRC" ]; then
+    echo "Linking student Chipyard configurations..."
+    while IFS= read -r -d '' file; do
+        name=$(basename "$file")
+        ln -sf "$file" "$DST/$name"
+        echo "  $name"
+    done < <(find "$STUDENT_SRC" -type f -name '*.scala' -print0)
+fi
+
 echo "Course configurations ready."
