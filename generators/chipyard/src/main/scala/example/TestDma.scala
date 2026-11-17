@@ -20,16 +20,18 @@ class WithTestDMA(baseAddress: BigInt = 0x20000000) extends Config((site, here, 
 
 class TestDMA(params: TestDMAParams)(implicit p: Parameters) extends LazyModule {
 
+  val device = new SimpleDevice("test-dma-device", Seq("ua,test-dma-device"))
+
   val mmioNode = TLRegisterNode(
     address = Seq(AddressSet(params.baseAddress, 0xfff)),
-    device = new SimpleDevice("test-dma-device", Seq("ua,test-dma-device")),
+    device = device,
     beatBytes = params.beatBytes,
     )
     
   val dmaNode = TLClientNode(Seq(TLMasterPortParameters.v1(Seq(TLClientParameters(
     name = "test-dma", sourceId = IdRange(0, 1))))))
 
-  val intNode = IntSourceNode(IntSourcePortSimple(num = 1))
+  val intNode = IntSourceNode(IntSourcePortSimple(num = 1, resources = device.int))
 
   lazy val module = new TestDMAModuleImp(this)
 }
