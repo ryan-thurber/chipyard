@@ -15,4 +15,8 @@ class StreamBaselineConfig extends Config(
           core = tp.tileParams.core.copy(fpu = Some(FPUParams()))))
     }
   }) ++
+  new WithInclusiveCache(
+    capacityKB = 1024,
+    nWays = 4
+  ) ++
   new BaselineConfig)
