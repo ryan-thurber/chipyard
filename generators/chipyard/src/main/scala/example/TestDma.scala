@@ -27,7 +27,7 @@ class TestDMA(params: TestDMAParams)(implicit p: Parameters) extends LazyModule 
     device = device,
     beatBytes = params.beatBytes,
     )
-    
+
   val dmaNode = TLClientNode(Seq(TLMasterPortParameters.v1(Seq(TLClientParameters(
     name = "test-dma", sourceId = IdRange(0, 1))))))
 
@@ -40,24 +40,40 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
 
   val (dmaOut, dmaEdge) = outer.dmaNode.out(0)
   val (interrupts, _) = outer.intNode.out(0)
-  
+
+  // Status encodings (read-only to software)
+  val STATUS_IDLE = 0.U(32.W)
+  val STATUS_BUSY = 1.U(32.W)
+  val STATUS_DONE = 2.U(32.W)
 
   val src_addr  = RegInit(0.U(64.W))
   val dst_addr  = RegInit(0.U(64.W))
   val length    = RegInit(0.U(32.W))
-  val status    = RegInit(0.U(32.W))
+  val status    = RegInit(STATUS_IDLE)
   val control   = RegInit(false.B)
 
+  // Level-sensitive interrupt line. Set when a transfer finishes, cleared by
+  // software writing 0 to the IRQ register (or by starting a new transfer).
   val irqWire = RegInit(false.B)
   interrupts(0) := irqWire
 
+  // NOTE: 64-bit fields must be written with 64-bit stores. The regmapper
+  // ignores writes that do not cover every byte of a field.
   outer.mmioNode.regmap(
-    0x00 -> Seq(RegField(64, src_addr,  RegFieldDesc("src_addr",  "DMA source address"))),
-    0x08 -> Seq(RegField(64, dst_addr,  RegFieldDesc("dst_addr",  "DMA destination address"))),
-    0x10 -> Seq(RegField(32, length,    RegFieldDesc("length",    "Transaction length"))),
-    0x14 -> Seq(RegField(32, status,    RegFieldDesc("status",    "DMA Status"))),
-    0x18 -> Seq(RegField(1,  control,   RegFieldDesc("control",   "DMA Control"))),
+    0x00 -> Seq(RegField(64, src_addr,  RegFieldDesc("src_addr",  "DMA source address (8-byte aligned)"))),
+    0x08 -> Seq(RegField(64, dst_addr,  RegFieldDesc("dst_addr",  "DMA destination address (8-byte aligned)"))),
+    0x10 -> Seq(RegField(32, length,    RegFieldDesc("length",    "Transaction length in bytes"))),
+    0x14 -> Seq(RegField.r(32, status,  RegFieldDesc("status",    "DMA status: 0=idle, 1=busy, 2=done"))),
+    0x18 -> Seq(RegField(1,  control,   RegFieldDesc("control",   "Write 1 to start; self-clears on completion"))),
+    0x1C -> Seq(RegField(1,  irqWire,   RegFieldDesc("irq",       "Interrupt pending; write 0 to clear"))),
     )
+
+  // Default values for the TileLink port. Chisel requires every output to be
+  // driven every cycle; the FSM below overrides these in the states that use
+  // the bus (last connection wins).
+  dmaOut.a.valid := false.B
+  dmaOut.a.bits  := DontCare
+  dmaOut.d.ready := false.B
 
   val s_idle :: s_read_req :: s_read_resp :: s_write_req :: s_write_resp :: s_done :: Nil = Enum(6)
   val state = RegInit(s_idle)
@@ -65,14 +81,18 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
   val dataBuffer = Reg(UInt(64.W))
   val bytesRemaining = RegInit(0.U(32.W))
 
+  // Each transfer moves one 8-byte beat: lgSize = log2(8) = 3. This matches
+  // the 64-bit dataBuffer and the +8 address increments.
+  val lgBeat = 3.U
+
   switch(state) {
 
     is(s_idle) {
-      status := 0.U
-      when(control === true.B) {
+      when(control) {
         bytesRemaining := length
-        status  := 1.U
-        state := s_read_req
+        status  := STATUS_BUSY
+        irqWire := false.B
+        state   := s_read_req
       }
     }
 
@@ -81,7 +101,7 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
       dmaOut.a.bits  := dmaEdge.Get(
         fromSource = 0.U,
         toAddress = src_addr,
-        lgSize = 4.U
+        lgSize = lgBeat
         )._2
 
       when(dmaOut.a.ready) {
@@ -103,7 +123,7 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
       dmaOut.a.bits := dmaEdge.Put(
         fromSource = 0.U,
         toAddress = dst_addr,
-        lgSize = 4.U,
+        lgSize = lgBeat,
         data = dataBuffer
         )._2
 
@@ -126,7 +146,7 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
     }
 
     is(s_done) {
-      status  := 0.U
+      status  := STATUS_DONE
       control := false.B
       irqWire := true.B
       state   := s_idle
@@ -136,7 +156,7 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
 }
 
 trait CanHavePeripheryTestDMA { this: BaseSubsystem =>
-  
+
   private val pbus = locateTLBusWrapper(PBUS)
   private val fbus = locateTLBusWrapper(FBUS)
 
@@ -147,5 +167,3 @@ trait CanHavePeripheryTestDMA { this: BaseSubsystem =>
     ibus.fromSync := testDMA.intNode
   }
 }
-
-                              
