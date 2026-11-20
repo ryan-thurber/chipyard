@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <riscv-pk/encoding.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #define DMA_BASE          0x20000000
 #define DMA_SRC_REG1       (DMA_BASE + 0x00)   // 64-bit
@@ -48,11 +49,17 @@ void __attribute__((interrupt, aligned(4))) handle_trap(void) {
 
 // TileLink transfers must be aligned to their size (8 bytes per DMA beat).
 // dst_buf is volatile because the compiler cannot see the DMA writing to it.
-static uint32_t src_buf1[4] __attribute__((aligned(16))) =
-    {0x11111111, 0x11111111, 0x11111111, 0x11111111};
-static uint32_t src_buf2[4] __attribute__((aligned(16))) =
-    {0x22222222, 0x33333333, 0x44444444, 0x55555555};
-static volatile uint32_t dst_buf[4] __attribute__((aligned(16))) = {0, 0, 0, 0};
+// static uint32_t src_buf1[16] __attribute__((aligned(16))) =
+    // {0x11111111, 0x11111111, 0x11111111, 0x11111111,
+	 // 0x11111111, 0x11111111, 0x11111111, 0x11111111,
+	 // 0x11111111, 0x11111111, 0x11111111, 0x11111111,
+	 // 0x11111111, 0x11111111, 0x11111111, 0x11111111};
+// static uint32_t src_buf2[16] __attribute__((aligned(16))) =
+    // {0x00000000, 0x11111111, 0x22222222, 0x33333333, 
+	 // 0x44444444, 0x55555555, 0x66666666, 0x77777777, 
+	 // 0x88888888, 0x99999999, 0xaaaaaaaa, 0xbbbbbbbb, 
+	 // 0xcccccccc, 0xdddddddd, 0xeeeeeeee, 0xffffffff};
+static volatile uint32_t dst_buf[100] __attribute__((aligned(16)));
 
 int main(void) {
 
@@ -67,6 +74,21 @@ int main(void) {
     // 3. Enable CPU external interrupts
     set_csr(mie, MIP_MEIP);
     set_csr(mstatus, MSTATUS_MIE);
+	
+	srand(13313);
+    int min = 1, max = 99999;
+	
+	// Setting up src_buf 1 and 2
+	uint32_t src_buf1[100] __attribute__((aligned(16))) = {0};
+	for(int i = 0; i < 100; i++)
+	{
+		src_buf1[i] = (rand() % (max - min + 1)) + min;
+	}
+	uint32_t src_buf2[100] __attribute__((aligned(16))) = {0};
+	for(int i = 0; i < 100; i++)
+	{
+		src_buf2[i] = (rand() % (max - min + 1)) + min;
+	}
 
     // 4. Program and start the DMA (64-bit stores for the 64-bit registers)
     REG64(DMA_SRC_REG1) = (uintptr_t)src_buf1;
@@ -87,7 +109,7 @@ int main(void) {
     }
 
     // 7. Verify results
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 100; i++) {
         if (dst_buf[i] != src_buf1[i] + src_buf2[i]) {
             printf("Mismatch at %d: got 0x%08x expected 0x%08x\n",
                    i, dst_buf[i], src_buf1[i] + src_buf2[i]);
