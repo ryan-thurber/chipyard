@@ -46,11 +46,12 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
   val STATUS_BUSY = 1.U(32.W)
   val STATUS_DONE = 2.U(32.W)
 
-  val src_addr  = RegInit(0.U(64.W))
-  val dst_addr  = RegInit(0.U(64.W))
-  val length    = RegInit(0.U(32.W))
-  val status    = RegInit(STATUS_IDLE)
-  val control   = RegInit(false.B)
+  val src_addr1  = RegInit(0.U(64.W))
+  val src_addr2  = RegInit(0.U(64.W))
+  val dst_addr   = RegInit(0.U(64.W))
+  val length     = RegInit(0.U(32.W))
+  val status     = RegInit(STATUS_IDLE)
+  val control    = RegInit(false.B)
 
   // Level-sensitive interrupt line. Set when a transfer finishes, cleared by
   // software writing 0 to the IRQ register (or by starting a new transfer).
@@ -60,12 +61,13 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
   // NOTE: 64-bit fields must be written with 64-bit stores. The regmapper
   // ignores writes that do not cover every byte of a field.
   outer.mmioNode.regmap(
-    0x00 -> Seq(RegField(64, src_addr,  RegFieldDesc("src_addr",  "DMA source address (8-byte aligned)"))),
-    0x08 -> Seq(RegField(64, dst_addr,  RegFieldDesc("dst_addr",  "DMA destination address (8-byte aligned)"))),
-    0x10 -> Seq(RegField(32, length,    RegFieldDesc("length",    "Transaction length in bytes"))),
-    0x14 -> Seq(RegField.r(32, status,  RegFieldDesc("status",    "DMA status: 0=idle, 1=busy, 2=done"))),
-    0x18 -> Seq(RegField(1,  control,   RegFieldDesc("control",   "Write 1 to start; self-clears on completion"))),
-    0x1C -> Seq(RegField(1,  irqWire,   RegFieldDesc("irq",       "Interrupt pending; write 0 to clear"))),
+    0x00 -> Seq(RegField(64, src_addr1,  RegFieldDesc("src_addr1",  "DMA source address 1 (8-byte aligned)"))),
+    0x08 -> Seq(RegField(64, src_addr2,  RegFieldDesc("src_addr2",  "DMA source address 2 (8-byte aligned)"))),
+    0x10 -> Seq(RegField(64, dst_addr,  RegFieldDesc("dst_addr",  "DMA destination address (8-byte aligned)"))),
+    0x18 -> Seq(RegField(32, length,    RegFieldDesc("length",    "Transaction length in bytes"))),
+    0x1C -> Seq(RegField.r(32, status,  RegFieldDesc("status",    "DMA status: 0=idle, 1=busy, 2=done"))),
+    0x20 -> Seq(RegField(1,  control,   RegFieldDesc("control",   "Write 1 to start; self-clears on completion"))),
+    0x24 -> Seq(RegField(1,  irqWire,   RegFieldDesc("irq",       "Interrupt pending; write 0 to clear"))),
     )
 
   // Default values for the TileLink port. Chisel requires every output to be
@@ -75,7 +77,7 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
   dmaOut.a.bits  := DontCare
   dmaOut.d.ready := false.B
 
-  val s_idle :: s_read_req :: s_read_resp :: s_write_req :: s_write_resp :: s_done :: Nil = Enum(6)
+  val s_idle :: s_read_req1 :: s_read_resp1 :: s_read_req2 :: s_read_resp2 :: s_write_req :: s_write_resp :: s_done :: Nil = Enum(8)
   val state = RegInit(s_idle)
 
   val dataBuffer = Reg(UInt(64.W))
@@ -92,28 +94,50 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
         bytesRemaining := length
         status  := STATUS_BUSY
         irqWire := false.B
-        state   := s_read_req
+        state   := s_read_req1
       }
     }
 
-    is(s_read_req) {
+    is(s_read_req1) {
       dmaOut.a.valid := true.B
       dmaOut.a.bits  := dmaEdge.Get(
         fromSource = 0.U,
-        toAddress = src_addr,
+        toAddress = src_addr1,
         lgSize = lgBeat
         )._2
 
       when(dmaOut.a.ready) {
-        state := s_read_resp
+        state := s_read_resp1
       }
     }
 
-    is(s_read_resp) {
+    is(s_read_resp1) {
       dmaOut.d.ready := true.B
       when(dmaOut.d.valid) {
         dataBuffer := dmaOut.d.bits.data
-        src_addr := src_addr + 8.U
+        src_addr1 := src_addr1 + 8.U
+        state := s_read_req2
+      }
+    }
+	
+	is(s_read_req2) {
+      dmaOut.a.valid := true.B
+      dmaOut.a.bits  := dmaEdge.Get(
+        fromSource = 0.U,
+        toAddress = src_addr2,
+        lgSize = lgBeat
+        )._2
+
+      when(dmaOut.a.ready) {
+        state := s_read_resp2
+      }
+    }
+
+    is(s_read_resp2) {
+      dmaOut.d.ready := true.B
+      when(dmaOut.d.valid) {
+        dataBuffer := dataBuffer + dmaOut.d.bits.data
+        src_addr2 := src_addr2 + 8.U
         state := s_write_req
       }
     }
@@ -140,7 +164,7 @@ class TestDMAModuleImp(outer: TestDMA) extends LazyModuleImp(outer) {
           state := s_done
         }.otherwise {
           bytesRemaining := bytesRemaining - 8.U
-          state := s_read_req
+          state := s_read_req1
         }
       }
     }

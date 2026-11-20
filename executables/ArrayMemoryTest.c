@@ -3,12 +3,13 @@
 #include <stdint.h>
 
 #define DMA_BASE          0x20000000
-#define DMA_SRC_REG       (DMA_BASE + 0x00)   // 64-bit
-#define DMA_DST_REG       (DMA_BASE + 0x08)   // 64-bit
-#define DMA_LENGTH        (DMA_BASE + 0x10)   // 32-bit
-#define DMA_STATUS        (DMA_BASE + 0x14)   // 32-bit, read-only: 0=idle 1=busy 2=done
-#define DMA_CONTROL       (DMA_BASE + 0x18)   // bit 0 = start
-#define DMA_IRQ           (DMA_BASE + 0x1C)   // bit 0 = irq pending, write 0 to clear
+#define DMA_SRC_REG1       (DMA_BASE + 0x00)   // 64-bit
+#define DMA_SRC_REG2       (DMA_BASE + 0x08)   // 64-bit
+#define DMA_DST_REG        (DMA_BASE + 0x10)   // 64-bit
+#define DMA_LENGTH         (DMA_BASE + 0x18)   // 32-bit
+#define DMA_STATUS         (DMA_BASE + 0x1C)   // 32-bit, read-only: 0=idle 1=busy 2=done
+#define DMA_CONTROL        (DMA_BASE + 0x20)   // bit 0 = start
+#define DMA_IRQ            (DMA_BASE + 0x24)   // bit 0 = irq pending, write 0 to clear
 
 #define DMA_STATUS_DONE   2
 
@@ -47,8 +48,10 @@ void __attribute__((interrupt, aligned(4))) handle_trap(void) {
 
 // TileLink transfers must be aligned to their size (8 bytes per DMA beat).
 // dst_buf is volatile because the compiler cannot see the DMA writing to it.
-static uint32_t src_buf[4] __attribute__((aligned(16))) =
-    {0xDEADBEEF, 0xCAFEBABE, 0x12345678, 0x9ABCDEF0};
+static uint32_t src_buf1[4] __attribute__((aligned(16))) =
+    {0x11111111, 0x11111111, 0x11111111, 0x11111111};
+static uint32_t src_buf2[4] __attribute__((aligned(16))) =
+    {0x22222222, 0x33333333, 0x44444444, 0x55555555};
 static volatile uint32_t dst_buf[4] __attribute__((aligned(16))) = {0, 0, 0, 0};
 
 int main(void) {
@@ -66,9 +69,10 @@ int main(void) {
     set_csr(mstatus, MSTATUS_MIE);
 
     // 4. Program and start the DMA (64-bit stores for the 64-bit registers)
-    REG64(DMA_SRC_REG) = (uintptr_t)src_buf;
+    REG64(DMA_SRC_REG1) = (uintptr_t)src_buf1;
+    REG64(DMA_SRC_REG2) = (uintptr_t)src_buf2;
     REG64(DMA_DST_REG) = (uintptr_t)dst_buf;
-    REG32(DMA_LENGTH)  = sizeof(src_buf);
+    REG32(DMA_LENGTH)  = sizeof(src_buf1);
     REG32(DMA_CONTROL) = 0x1;                        // start
 
     // 5. Wait for the interrupt handler to set the flag
@@ -84,11 +88,18 @@ int main(void) {
 
     // 7. Verify results
     for (int i = 0; i < 4; i++) {
-        if (dst_buf[i] != src_buf[i]) {
+        if (dst_buf[i] != src_buf1[i] + src_buf2[i]) {
             printf("Mismatch at %d: got 0x%08x expected 0x%08x\n",
-                   i, dst_buf[i], src_buf[i]);
+                   i, dst_buf[i], src_buf1[i] + src_buf2[i]);
             return 1;
         }
+		// I'd like visual proof that both buffers contain the same value
+		else {
+			printf("Index: %d\n", i);
+			printf("Source Buffer 1    - 0x%08x\n", src_buf1[i]);
+			printf("Source Buffer 2    - 0x%08x\n", src_buf2[i]);
+			printf("Destination Buffer - 0x%08x\n", dst_buf[i]);
+		}
     }
 
     printf("DMA test passed\n");
